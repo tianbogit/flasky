@@ -2,6 +2,10 @@
 # @Time    : 2018/9/12 11:33
 # @Author  : TIANPO
 # @Email   : mailtp@foxmail.com
+
+# 生成确认令牌的包
+from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
+from flask import current_app
 from . import db
 # 提供密码散列值生成及校验
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -26,6 +30,8 @@ UserMixin：是flask-login提供的一个类，其中包含默认的实现
             is_anonymous() 对普通用户必须返回 False
             get_id() 必须返回用户的唯一标识符，使用 Unicode 编码字符串
 '''
+
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -47,6 +53,25 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return '<User %r>' % self.username
+
+    confirmed = db.Column(db.Boolean, default=False)
+
+    def generate_confirmation_token(self, expiration=3600):
+        s = Serializer(current_app.config['SECRET_KEY'], expiration)
+        return s.dumps({'confirm': self.id})
+
+    def confirm(self, token):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token)
+        except:
+            return False
+        if data.get('confirm') != self.id:
+            return False
+        self.confirmed = True
+        db.session.add(self)
+        return True
+
 
 # 加载用户回调
 @login_manager.user_loader
