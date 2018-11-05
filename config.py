@@ -6,6 +6,7 @@
 import os
 
 basedir = os.path.abspath(os.path.dirname(__file__))
+mysqluer = os.environ.get('MYSQL')
 
 
 class Config:
@@ -28,18 +29,18 @@ class DevelopmentConfig(Config):
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL') or \
-                              'mysql+pymysql://**/awesome'
+                              'mysql+pymysql://' + mysqluer + '/awesome'
 
 
 class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL') or \
-                              'mysql+pymysql://**/awesome'
+                              'mysql+pymysql://' + mysqluer + '/awesome'
 
 
 class ProductionConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-                              'mysql+pymysql://**5/awesome'
+                              'mysql+pymysql://' + mysqluer + '/awesome'
 
 
 config = {
