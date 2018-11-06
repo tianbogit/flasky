@@ -9,7 +9,7 @@ from flask import current_app
 from . import db
 # 提供密码散列值生成及校验
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import UserMixin,AnonymousUserMixin
+from flask_login import UserMixin, AnonymousUserMixin
 from . import login_manager
 
 
@@ -50,6 +50,8 @@ UserMixin：是flask-login提供的一个类，其中包含默认的实现
             is_anonymous() 对普通用户必须返回 False
             get_id() 必须返回用户的唯一标识符，使用 Unicode 编码字符串
 """
+
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -90,17 +92,33 @@ class User(UserMixin, db.Model):
         db.session.add(self)
         return True
 
-    def __init__(self,**kwargs):
-        super(User,self).__init__(**kwargs)
+    def __init__(self, **kwargs):
+        super(User, self).__init__(**kwargs)
         # 把config['FLASKY_ADMIN']初始化为管理员角色
         if self.role is None:
-            if self.email==current_app.config['FLASKY_ADMIN']:
-                self.role=Role.query.filter_by(permissions=0xff).first()
+            if self.email == current_app.config['FLASKY_ADMIN']:
+                self.role = Role.query.filter_by(permissions=0xff).first()
             if self.role is None:
                 self.role = Role.query.filter_by(default=True).first()
 
-    def can(self,permissions):
-        pass
+    def can(self, permissions):
+        return self.role is not None and (self.role.permissions & permissions) == permissions
+
+    def is_administrator(self):
+        return self.can(Permission.ADMINISTER)
+
+# 设为用户未登录时current_user 的值,这样程序不用先检查用户是否登录
+# 就能自由调用 current_user.can()和current_user.is_administrator()
+class AnonymousUser(AnonymousUserMixin):
+    def can(self, permission):
+        return False
+
+    def is_administrator(self):
+        return False
+
+
+login_manager.anonymous_user = AnonymousUser
+
 
 # 加载用户回调
 @login_manager.user_loader
