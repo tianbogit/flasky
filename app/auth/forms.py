@@ -3,7 +3,7 @@
 # @Author  : TIANPO
 # @Email   : mailtp@foxmail.com
 # @File    : forms.py
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import Required, Length, Email, Regexp, EqualTo
 from wtforms import ValidationError
@@ -11,7 +11,7 @@ from ..models import User
 
 
 # 登录表单
-class LoginForm(Form):
+class LoginForm(FlaskForm):
     email = StringField('Email', validators=[Required(), Length(1, 64), Email()])
     password = PasswordField('Password', validators=[Required()])
     remember_me = BooleanField('Keep me logged in')
@@ -19,7 +19,7 @@ class LoginForm(Form):
 
 
 # 注册表单
-class RegistrationForm(Form):
+class RegistrationForm(FlaskForm):
     email = StringField('Email', validators=[Required(), Length(1, 64),
                                              Email()])
     username = StringField('Username', validators=[
@@ -37,3 +37,34 @@ class RegistrationForm(Form):
     def validate_username(self, field):
         if User.query.filter_by(username=field.data).first():
             raise ValidationError('Username already in use.')
+
+
+# 修改密码
+class ChanagePwdForm(FlaskForm):
+    old_pwd = PasswordField('Old password', validators=[Required()])
+    password = PasswordField('New password',
+                             validators=[Required(), EqualTo('password2', message='Passwords must match')])
+    password2 = PasswordField('Confirm new password', validators=[Required()])
+    submit = SubmitField('Update')
+
+
+# 邮箱密码重置
+class ResetPwdForm(FlaskForm):
+    email = StringField('Eamil', validators=[Required(), Length(1, 64), Email()])
+    submit = SubmitField('Reset')
+
+    def validate_email(self, field):
+        if User.query.filter_by(email=field.data).first() is None:
+            raise ValidationError('Unkown email address.')
+
+
+# 修改邮箱
+class ChangeEmailForm(FlaskForm):
+    email = StringField('New Email', validators=[Required(), Length(1, 64),
+                                                 Email()])
+    password = PasswordField('Password', validators=[Required()])
+    submit = SubmitField('Update')
+
+    def validate_email(self, field):
+        if User.query.filter_by(email=field.data).first():
+            raise ValidationError('Email already registered.')

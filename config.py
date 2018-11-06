@@ -14,7 +14,7 @@ class Config:
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     FLASKY_MAIL_SUBJECT_PREFIX = '[Flasky]'
     FLASKY_MAIL_SENDER = 'Flasky Admin <qmyg_tianpo@163.com>'
-    FLASKY_ADMIN = os.environ.get('FLASKY_ADMIN') or 'qmyg_tianpo@163.com'
+    FLASKY_ADMIN = os.environ.get('FLASKY_ADMIN')
 
     @staticmethod
     def init_app(app):
@@ -24,7 +24,7 @@ class Config:
 class DevelopmentConfig(Config):
     DEBUG = True
     MAIL_SERVER = 'smtp.163.com'
-    MAIL_PORT = 465
+    MAIL_PORT = 25
     MAIL_USE_TLS = True
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME') or 'qmyg_tianpo@163.com'
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')

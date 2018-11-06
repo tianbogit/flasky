@@ -19,6 +19,7 @@
             <ul class="nav navbar-nav navbar-right">
                 # is_authenticated是属性而不是方法
                 {% if current_user.is_authenticated %}
+                <li><a href="{{ url_for('auth.change_pwd') }}">Change Password</a></li>
                 <li><a href="{{ url_for('auth.logout') }}">Sign Out</a></li>
                 {% else %}
                 <li><a href="{{ url_for('auth.login') }}">Sign In</a></li>
