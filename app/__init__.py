@@ -9,6 +9,7 @@ from flask_mail import Mail
 from flask_sqlalchemy import SQLAlchemy
 from config import config
 from flask_login import LoginManager
+from flask_pagedown import PageDown
 
 boostrap = Bootstrap()
 # 本地化日期和时间
@@ -16,6 +17,7 @@ moment=Moment()
 mail = Mail()
 db = SQLAlchemy()
 login_manager = LoginManager()
+pagedown=PageDown()
 '''
 可以设为 None 、 'basic' 或 'strong' ，以提
 供不同的安全等级防止用户会话遭篡改。设为 'strong' 时，Flask-Login 会记录客户端 IP
@@ -36,7 +38,7 @@ def create_app(config_name):
     mail.init_app(app)
     db.init_app(app)
     login_manager.init_app(app)
-
+    pagedown.init_app(app)
     # 附加路由和自定义的错误页面
     from .main import main as main_blueprint
     app.register_blueprint(main_blueprint)

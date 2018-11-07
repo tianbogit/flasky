@@ -3,7 +3,7 @@
 # @Author  : TIANPO
 # @Email   : mailtp@foxmail.com
 from datetime import datetime
-from flask import render_template, session, redirect, url_for, abort, flash
+from flask import render_template, session, redirect, url_for, abort, flash, request, current_app
 from flask_login import login_required, current_user
 from . import main
 from .forms import NameForm, EditProfileForm, EditProfileAdminForm, PostForm
@@ -56,8 +56,13 @@ def edit_profile_admin(id):
         user.location = form.location.data
         user.about_me = form.about_me.data
         db.session.add(user)
-        flash('The profile has been updated.')
-        return redirect(url_for('.user', username=user.username))
+        try:
+            db.session.flush()
+            db.session.commit()
+            flash('The profile has been updated.')
+            return redirect(url_for('.user', username=user.username))
+        except:
+            db.session.rollback()
     form.email.data = user.email
     form.username.data = user.username
     form.confirmed.data = user.confirmed
@@ -80,8 +85,12 @@ def index():
         post = Post(body=form.body.data, author=current_user._get_current_object())
         db.session.add(post)
         return redirect(url_for('.index'))
-    posts = Post.query.order_by(Post.timestamp.desc()).all()
-    return render_template('index.html', form=form, posts=posts)
+    page = request.args.get('page', 1, type=int)
+    pagination = Post.query.order_by(Post.timestamp.desc()).paginate(
+        page, per_page=current_app.config['PAGE_SIZE'],
+        error_out=False)
+    posts = pagination.items
+    return render_template('index.html', form=form, posts=posts, pagination=pagination)
 
 
 # 编辑
