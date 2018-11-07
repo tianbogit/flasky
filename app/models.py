@@ -5,14 +5,17 @@
 
 # 生成确认令牌的包
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
-from flask import current_app
+from flask import current_app, request
 from . import db
 # 提供密码散列值生成及校验
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin, AnonymousUserMixin
+import datetime
+import hashlib
 from . import login_manager
 
 
+# 角色模型
 class Role(db.Model):
     __tablename__ = 'roles'
     id = db.Column(db.Integer, primary_key=True)
@@ -43,15 +46,11 @@ class Role(db.Model):
         db.session.commit()
 
 
-"""
-UserMixin：是flask-login提供的一个类，其中包含默认的实现
-            is_authenticated() 如果用户已经登录，必须返回 True ，否则返回 False
-            is_active() 如果允许用户登录，必须返回 True ，否则返回 False 。如果要禁用账户，可以返回 False
-            is_anonymous() 对普通用户必须返回 False
-            get_id() 必须返回用户的唯一标识符，使用 Unicode 编码字符串
-"""
-
-
+# UserMixin：是flask-login提供的一个类，其中包含默认的实现
+#            is_authenticated() 如果用户已经登录，必须返回 True ，否则返回 False
+#             is_active() 如果允许用户登录，必须返回 True ，否则返回 False 。如果要禁用账户，可以返回 False
+#             is_anonymous() 对普通用户必须返回 False
+#             get_id() 必须返回用户的唯一标识符，使用 Unicode 编码字符串
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -59,6 +58,13 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, index=True)
     password_hash = db.Column(db.String(128))
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+    name = db.Column(db.String(64))
+    location = db.Column(db.String(64))
+    about_me = db.Column(db.Text())
+    member_since = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
+    last_seen = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
+    avatar_hash = db.Column(db.String(32))
+    posts = db.relationship('Post', backref='author', lazy='dynamic')
 
     @property
     def password(self):
@@ -101,11 +107,79 @@ class User(UserMixin, db.Model):
             if self.role is None:
                 self.role = Role.query.filter_by(default=True).first()
 
+        if self.email is not None and self.avatar_hash is None:
+            self.avatar_hash = hashlib.md5(self.email.encode('utf-8')).hexdigest()
+
     def can(self, permissions):
         return self.role is not None and (self.role.permissions & permissions) == permissions
 
     def is_administrator(self):
         return self.can(Permission.ADMINISTER)
+
+    # 刷新访问时间
+    def ping(self):
+        self.last_seen = datetime.datetime.utcnow()
+        db.session.add(self)
+
+    # 修改邮箱
+    def change_email(self, token):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token)
+        except:
+            return False
+        if data.get('change_email') != self.id:
+            return False
+        new_email = data.get('new_email')
+        if new_email is None:
+            return False
+        if self.query.filter_by(email=new_email).first() is not None:
+            return False
+        self.email = new_email
+        self.avatar_hash = hashlib.md5(
+            self.email.encode('utf-8')).hexdigest()
+        db.session.add(self)
+        return True
+
+    # Gravatar 是一个行业领先的头像服务
+    def gravatar(self, size=100, default='identicon', rating='g'):
+        if request.is_secure:
+            url = 'https://secure.gravatar.com/avatar'
+        else:
+            url = 'http://www.gravatar.com/avatar'
+        hash = self.avatar_hash or hashlib.md5(
+            self.email.encode('utf-8')).hexdigest()
+        return '{url}/{hash}?s={size}&d={default}&r={rating}'.format(
+            url=url, hash=hash, size=size, default=default, rating=rating)
+
+    # 生成测试用户
+    @staticmethod
+    def generate_fake(count=100):
+        from sqlalchemy.exc import IntegrityError
+        from random import seed
+        import forgery_py
+        seed()
+        for i in range(count):
+            u = User(email=forgery_py.internet.email_address(),
+                     username=forgery_py.internet.user_name(True),
+                     password=forgery_py.lorem_ipsum.word(),
+                     confirmed=True,
+                     name=forgery_py.name.full_name(),
+                     location=forgery_py.address.city(),
+                     about_me=forgery_py.lorem_ipsum.sentence(),
+                     member_since=forgery_py.date.date(True))
+            db.session.add(u)
+        try:
+            """
+            在SQLAlchemy中一个Session（可以看作）是一个transaction，每个操作（基本上）对应一条或多条SQL语句，这些SQL语句需要发送到数据库服务器才能被真正执行，而整个transaction需要commit才能真正生效，如果没提交，一旦你的程序挂了，所有未提交的事务都会被回滚到事务开始之前的状态。
+flush就是把客户端尚未发送到数据库服务器的SQL语句发送过去，commit就是告诉数据库服务器提交事务。
+简单说，flush之后你才能在这个Session中看到效果，而commit之后你才能从其它Session中看到效果。
+            """
+            db.session.flush()
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+
 
 # 设为用户未登录时current_user 的值,这样程序不用先检查用户是否登录
 # 就能自由调用 current_user.can()和current_user.is_administrator()
@@ -133,3 +207,27 @@ class Permission:
     WRITE_ARTICLES = 0x04
     MODERATE_COMMENTS = 0x08
     ADMINISTER = 0x80
+
+
+class Post(db.Model):
+    __tablename__ = 'posts'
+    id = db.Column(db.Integer, primary_key=True)
+    body = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime(), index=True, default=datetime.datetime.utcnow)
+    author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # 生成测试数据
+    @staticmethod
+    def generate_fake(count=100):
+        from random import seed, randint
+
+        import forgery_py
+        seed()
+        user_count = User.query.count()
+        for i in range(count):
+            u = User.query.offset(randint(0, user_count - 1)).first()
+            p = Post(body=forgery_py.lorem_ipsum.sentences(randint(1, 3)),
+                     timestamp=forgery_py.date.date(True),
+                     author=u)
+            db.session.add(p)
+        db.session.commit()

@@ -4,12 +4,15 @@
 # @Email   : mailtp@foxmail.com
 from flask import Flask, render_template
 from flask_bootstrap import Bootstrap
+from flask_moment import Moment
 from flask_mail import Mail
 from flask_sqlalchemy import SQLAlchemy
 from config import config
 from flask_login import LoginManager
 
 boostrap = Bootstrap()
+# 本地化日期和时间
+moment=Moment()
 mail = Mail()
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -29,6 +32,7 @@ def create_app(config_name):
     config[config_name].init_app(app)
 
     boostrap.init_app(app)
+    moment.init_app(app)
     mail.init_app(app)
     db.init_app(app)
     login_manager.init_app(app)
