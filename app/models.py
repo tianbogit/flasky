@@ -48,6 +48,18 @@ class Role(db.Model):
         db.session.commit()
 
 
+# 关注者
+# SQLAlchemy 不能直接使用这个关联表，因为如果这么做程序就无法访问其中的自定义字段。
+# 把这个多对多关系的左右两侧拆分成两个基本的一对多关系
+class Follow(db.Model):
+    __tablename__ = 'follows'
+    follower_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+                            primary_key=True)
+    followed_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+                            primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+
 # UserMixin：是flask-login提供的一个类，其中包含默认的实现
 #            is_authenticated() 如果用户已经登录，必须返回 True ，否则返回 False
 #             is_active() 如果允许用户登录，必须返回 True ，否则返回 False 。如果要禁用账户，可以返回 False
@@ -67,6 +79,40 @@ class User(UserMixin, db.Model):
     last_seen = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
     avatar_hash = db.Column(db.String(32))
     posts = db.relationship('Post', backref='author', lazy='dynamic')
+    # lazy='joined' 模式，就可在一次数据库查询中完成这些操作。
+    # 默认值 select ，那么首次访问 follower 和 followed 属性时才会加载对应的用户
+    followed = db.relationship('Follow',
+                               foreign_keys=[Follow.follower_id],
+                               backref=db.backref('follower', lazy='joined'),
+                               lazy='dynamic',
+                               cascade='all, delete-orphan')
+    # 删除对象时，默认的层叠行为是把对象联接的所有相关对象的外键设为空值。但在关联表中，删除记录后正确的
+    # 行为应该是把指向该记录的实体也删除，因为这样能有效销毁联接。这就是层叠选项值delete-orphan 的作用。
+    followers = db.relationship('Follow',
+                                foreign_keys=[Follow.followed_id],
+                                backref=db.backref('followed', lazy='joined'),
+                                lazy='dynamic',
+                                cascade='all, delete-orphan')
+
+    # 关注
+    def follow(self, user):
+        if not self.is_following(user):
+            f = Follow(follower=self, followed=user)
+            db.session.add(f)
+
+    # 是否已关注
+    def is_following(self, user):
+        return self.followed.filter_by(followed_id=user.id).first() is not None
+
+    # 取消关注
+    def unfollow(self, user):
+        f = self.followed.filter_by(followed_id=user.id).first()
+        if f:
+            db.session.delete(f)
+
+    # 是否被指定用户关注
+    def is_followed_by(self, user):
+        return self.followers.filter_by(follower_id=user.id).first() is not None
 
     @property
     def password(self):
