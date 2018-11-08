@@ -13,11 +13,11 @@ from flask_pagedown import PageDown
 
 boostrap = Bootstrap()
 # 本地化日期和时间
-moment=Moment()
+moment = Moment()
 mail = Mail()
 db = SQLAlchemy()
 login_manager = LoginManager()
-pagedown=PageDown()
+pagedown = PageDown()
 '''
 可以设为 None 、 'basic' 或 'strong' ，以提
 供不同的安全等级防止用户会话遭篡改。设为 'strong' 时，Flask-Login 会记录客户端 IP
@@ -46,6 +46,8 @@ def create_app(config_name):
     # 认证蓝本
     from .auth import auth as auth_blueprint
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
+
+    # api
+    from .api_1_0 import api as api_1_0_blueprint
+    app.register_blueprint(api_1_0_blueprint, url_prefix='/api/v1.0')
     return app
-
-
