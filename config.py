@@ -16,6 +16,7 @@ class Config:
     FLASKY_MAIL_SENDER = 'Flasky Admin <qmyg_tianpo@163.com>'
     FLASKY_ADMIN = os.environ.get('FLASKY_ADMIN')
     PAGE_SIZE = os.environ.get('FLASKY_POSTS_PER_PAGE') or 20
+    COMMENTS_PAGE_SIZE = os.environ.get('COMMENTS_PAGE_SIZE') or 5
 
     @staticmethod
     def init_app(app):

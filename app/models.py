@@ -79,6 +79,7 @@ class User(UserMixin, db.Model):
     last_seen = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
     avatar_hash = db.Column(db.String(32))
     posts = db.relationship('Post', backref='author', lazy='dynamic')
+    comments = db.relationship('Comment', backref='author', lazy='dynamic')
     # lazy='joined' 模式，就可在一次数据库查询中完成这些操作。
     # 默认值 select ，那么首次访问 follower 和 followed 属性时才会加载对应的用户
     followed = db.relationship('Follow',
@@ -113,6 +114,11 @@ class User(UserMixin, db.Model):
     # 是否被指定用户关注
     def is_followed_by(self, user):
         return self.followers.filter_by(follower_id=user.id).first() is not None
+
+    # 获取所关注用户文章
+    @property
+    def followed_posts(self):
+        return Post.query.join(Follow, Follow.followed_id == Post.author_id).filter(Follow.follower_id == self.id)
 
     @property
     def password(self):
@@ -157,6 +163,8 @@ class User(UserMixin, db.Model):
 
         if self.email is not None and self.avatar_hash is None:
             self.avatar_hash = hashlib.md5(self.email.encode('utf-8')).hexdigest()
+        # 关注自己
+        self.follow(self)
 
     def can(self, permissions):
         return self.role is not None and (self.role.permissions & permissions) == permissions
@@ -228,6 +236,16 @@ flush就是把客户端尚未发送到数据库服务器的SQL语句发送过去
         except IntegrityError:
             db.session.rollback()
 
+    # 用户设为自己的关注者
+    @staticmethod
+    def add_self_follows():
+        for user in User.query.all():
+            if not user.is_following(user):
+                user.follow(user)
+
+        db.session.add(user)
+        db.session.commit()
+
 
 # 设为用户未登录时current_user 的值,这样程序不用先检查用户是否登录
 # 就能自由调用 current_user.can()和current_user.is_administrator()
@@ -264,6 +282,7 @@ class Post(db.Model):
     body_html = db.Column(db.Text)
     timestamp = db.Column(db.DateTime(), index=True, default=datetime.datetime.utcnow)
     author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    comments = db.relationship('Comment', backref='post', lazy='dynamic')
 
     # markdown转为html并清理，只允许html标签
     @staticmethod
@@ -294,3 +313,26 @@ class Post(db.Model):
 
 # SQLAlchemy“set”事件的监听程序,body 字段设了新值，函数就会自动被调用
 db.event.listen(Post.body, 'set', Post.on_changed_body)
+
+
+# 评论
+class Comment(db.Model):
+    __tablename__ = 'comments'
+    id = db.Column(db.Integer, primary_key=True)
+    body = db.Column(db.Text)
+    body_html = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.datetime.utcnow)
+    disabled = db.Column(db.Boolean)
+    author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'))
+
+    @staticmethod
+    def on_changed_body(target, value, oldvalue, initiator):
+        allowed_tags = ['a', 'abbr', 'acronym', 'b', 'code', 'em', 'i',
+                        'strong']
+        target.body_html = bleach.linkify(bleach.clean(
+            markdown(value, output_format='html'),
+            tags=allowed_tags, strip=True))
+
+
+db.event.listen(Comment.body, 'set', Comment.on_changed_body)

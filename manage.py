@@ -4,7 +4,7 @@
 # @Email   : mailtp@foxmail.com
 import os
 from app import create_app, db
-from app.models import User, Role, Post,Follow
+from app.models import User, Role, Post, Follow,Comment
 from flask_script import Manager, Shell
 from flask_moment import Moment
 
@@ -23,7 +23,7 @@ moment = Moment(app)
 
 # shell界面回传参数，可以直接使用
 def make_shell_context():
-    return dict(app=app, db=db, User=User, Role=Role, Post=Post,Follow=Follow)
+    return dict(app=app, db=db, User=User, Role=Role, Post=Post, Follow=Follow,Comment=Comment)
 
 
 # 注册shell命令：通过这种方式调用（python manager.py shell）
