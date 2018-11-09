@@ -25,7 +25,9 @@ def forbidden(message):
     response.status_code = 403
     return response
 
-
+# 全局异常捕获
+# 这个修饰器从 API 蓝本中调用，所以只有当处理蓝本中的路由时抛出了异常才会调用
+# 这个处理程序。
 @api.errorhandler(ValidationError)
 def validation_error(e):
     return bad_request(e.args[0])
