@@ -157,6 +157,22 @@ def follow(username):
     return redirect(url_for('.user', username=username))
 
 
+@main.route('/unfollow/<username>')
+@login_required
+@permission_required(Permission.FOLLOW)
+def unfollow(username):
+    user = User.query.filter_by(username=username).first()
+    if user is None:
+        flash('Invalid user.')
+        return redirect(url_for('.index'))
+    if not current_user.is_following(user):
+        flash('You are not following this user.')
+        return redirect(url_for('.user', username=username))
+    current_user.unfollow(user)
+    flash('You are not following %s anymore.' % username)
+    return redirect(url_for('.user', username=username))
+
+
 # 分页获取关注者
 @main.route('/followers/<username>')
 def followers(username):
@@ -235,6 +251,7 @@ def moderate_enable(id):
     return redirect(url_for('.moderate',
                             page=request.args.get('page', 1, type=int)))
 
+
 # 评论不可见
 @main.route('/moderate/disable/<int:id>')
 @login_required
@@ -245,3 +262,28 @@ def moderate_disable(id):
     db.session.add(comment)
     return redirect(url_for('.moderate',
                             page=request.args.get('page', 1, type=int)))
+
+
+@main.route('/shutdown')
+def server_shutdown():
+    if not current_app.testing:
+        abort(404)
+    shutdown = request.environ.get('werkzeug.server.shutdown')
+    if not shutdown:
+        abort(500)
+    shutdown()
+    return 'Shut down......'
+
+
+from flask_sqlalchemy import get_debug_queries
+
+# 慢查询报告
+@main.after_app_request
+def after_request(response):
+    for query in get_debug_queries():
+        if query.duration >= current_app.config['FLASKY_DB_QUERY_TIMEOUT']:
+            current_app.logger.warning(
+                'Slow query: %s\nParameters: %s\nDuration: %fs\nContext: %s\n' %
+                (query.statement, query.parameters, query.duration,
+                 query.context))
+    return response

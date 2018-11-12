@@ -260,7 +260,7 @@ class User(UserMixin, db.Model):
 flush就是把客户端尚未发送到数据库服务器的SQL语句发送过去，commit就是告诉数据库服务器提交事务。
 简单说，flush之后你才能在这个Session中看到效果，而commit之后你才能从其它Session中看到效果。
             """
-            db.session.flush()
+            #db.session.flush()
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
